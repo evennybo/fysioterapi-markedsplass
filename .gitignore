@@ -10,8 +10,8 @@ venv/
 frontend/node_modules/
 frontend/dist/
 
-# Database (ikke commit selve .db – for stor og endres kontinuerlig)
-# backend/fysioterapeuter.db  ← vi inkluderer den for deploy (read-only data)
+# Database – for stor for git, lastes ned av Railway ved oppstart
+backend/fysioterapeuter.db
 
 # OS
 .DS_Store
