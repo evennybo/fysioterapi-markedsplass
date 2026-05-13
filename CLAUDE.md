@@ -119,6 +119,44 @@ Bruk disse i Claude Code:
 - `/statistikk` – Viser databasestatistikk
 - `/geokod` – Geokoder adresser (krever internett)
 
+## Branch-workflow (alltid bruk feature-branches)
+
+All utvikling skjer på feature-branches. Aldri commit direkte til `main`.
+
+### Start ny oppgave
+
+```bash
+git checkout main && git pull          # Alltid start fra oppdatert main
+git checkout -b feature/<kort-navn>    # Lag feature-branch
+```
+
+**Navnekonvensjon:**
+- `feature/bildeopplasting`
+- `fix/kart-viser-ikke`
+- `chore/oppdater-avhengigheter`
+
+### Avslutt og lag PR
+
+```bash
+git push -u origin feature/<kort-navn>
+gh pr create --fill                    # gh må være innlogget: gh auth login
+```
+
+Claude lager alltid PR med `/create-pr` kommandoen på slutten av en sesjon.
+
+### Merge
+
+Merge via GitHub-UI (Squash and merge anbefalt). Slett branchen etter merge.
+
+### Branch-beskyttelse på GitHub
+
+For å tvinge branch-workflow (anbefalt):
+1. Gå til github.com/evennybo/fysioterapi-markedsplass → Settings → Branches
+2. Add branch protection rule for `main`
+3. Huk av: **Require a pull request before merging**
+
+---
+
 ## Vanlige oppgaver for Claude Code
 
 ```
