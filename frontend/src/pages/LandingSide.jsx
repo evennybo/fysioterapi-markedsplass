@@ -142,9 +142,6 @@ export default function LandingSide() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                       <span style={{ fontFamily: 'var(--font-d)', fontWeight: 700, fontSize: '1rem', color: 'var(--text)' }}>{f.navn}</span>
-                      <span style={{ fontSize: '.72rem', background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 7px', color: 'var(--muted)', flexShrink: 0 }}>
-                        {f.organisasjonsform_kode}
-                      </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '.83rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>

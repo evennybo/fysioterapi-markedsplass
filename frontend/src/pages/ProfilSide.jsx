@@ -1,5 +1,5 @@
 // src/pages/ProfilSide.jsx
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { hentFysioterapeut, oppdaterProfil } from '../lib/api.js'
 import { Nav, Footer, Tag, Icon, SectionHead, FaqAccordion, QuickFacts } from '../components/shared.jsx'
@@ -108,6 +108,120 @@ function KrevProfil({ orgnr, navn }) {
   )
 }
 
+// ── Bildeopplasting (canvas-komprimering, ingen ekstern tjeneste) ──────────────
+function BildeOpplasting({ bildeUrl, onChange }) {
+  const [dragOver, setDragOver] = useState(false)
+  const [laster, setLaster] = useState(false)
+  const inputRef = useRef(null)
+
+  const komprimer = useCallback((fil) => {
+    return new Promise((resolve, reject) => {
+      if (!fil.type.startsWith('image/')) { reject(new Error('Kun bildefiler støttes (JPG, PNG, WebP)')); return }
+      if (fil.size > 10 * 1024 * 1024) { reject(new Error('Filen er for stor – maks 10 MB')); return }
+      const img = new Image()
+      const objUrl = URL.createObjectURL(fil)
+      img.onload = () => {
+        URL.revokeObjectURL(objUrl)
+        const MAX = 600
+        let w = img.naturalWidth, h = img.naturalHeight
+        const ratio = Math.min(MAX / w, MAX / h, 1)
+        w = Math.round(w * ratio); h = Math.round(h * ratio)
+        const canvas = document.createElement('canvas')
+        canvas.width = w; canvas.height = h
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+        // Komprimerer til maks ~150 KB
+        let quality = 0.85
+        let dataUrl = canvas.toDataURL('image/jpeg', quality)
+        while (dataUrl.length > 200_000 && quality > 0.3) {
+          quality -= 0.1
+          dataUrl = canvas.toDataURL('image/jpeg', quality)
+        }
+        resolve(dataUrl)
+      }
+      img.onerror = () => { URL.revokeObjectURL(objUrl); reject(new Error('Klarte ikke lese bildet')) }
+      img.src = objUrl
+    })
+  }, [])
+
+  const handterFil = useCallback(async (fil) => {
+    if (!fil) return
+    setLaster(true)
+    try {
+      const dataUrl = await komprimer(fil)
+      onChange(dataUrl)
+    } catch (e) {
+      alert(e.message)
+    } finally {
+      setLaster(false)
+    }
+  }, [komprimer, onChange])
+
+  const onDrop = (e) => {
+    e.preventDefault(); setDragOver(false)
+    handterFil(e.dataTransfer.files[0])
+  }
+
+  return (
+    <div>
+      <label style={lbl}>Profilbilde</label>
+      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        {/* Drop-sone / velg-knapp */}
+        <div
+          onClick={() => !laster && inputRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={onDrop}
+          style={{
+            flex: '1 1 180px',
+            minHeight: 80,
+            border: `2px dashed ${dragOver ? 'var(--accent)' : 'var(--border)'}`,
+            borderRadius: 'var(--r)',
+            background: dragOver ? 'var(--accent-muted)' : 'var(--elevated)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            cursor: laster ? 'wait' : 'pointer',
+            transition: 'border-color .15s, background .15s',
+            padding: '16px 12px',
+          }}
+        >
+          {laster ? (
+            <div style={{ width: 22, height: 22, borderRadius: '50%', border: '3px solid var(--border)', borderTopColor: 'var(--accent)', animation: 'spin .7s linear infinite' }} />
+          ) : (
+            <>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/>
+              </svg>
+              <span style={{ fontSize: '.78rem', color: 'var(--muted)', textAlign: 'center', lineHeight: 1.4 }}>
+                {bildeUrl ? 'Klikk eller dra for å bytte bilde' : 'Klikk eller dra bilde hit'}
+              </span>
+              <span style={{ fontSize: '.7rem', color: 'var(--muted)', opacity: .6 }}>JPG · PNG · WebP · maks 10 MB</span>
+            </>
+          )}
+        </div>
+        {/* Forhåndsvisning */}
+        {bildeUrl && (
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <img
+              src={bildeUrl}
+              alt="Profilbilde"
+              style={{ width: 80, height: 80, borderRadius: 'var(--r)', objectFit: 'cover', border: '2px solid var(--accent)', display: 'block' }}
+            />
+            <button
+              onClick={() => onChange('')}
+              title="Fjern bilde"
+              style={{ position: 'absolute', top: -8, right: -8, width: 22, height: 22, borderRadius: '50%', background: '#c53030', border: '2px solid var(--surface)', color: '#fff', fontSize: '.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+            >✕</button>
+          </div>
+        )}
+      </div>
+      <input ref={inputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handterFil(e.target.files[0])} />
+    </div>
+  )
+}
+
 // ── Rediger profil ────────────────────────────────────────────────────────────
 function RedigerProfil({ f, onLagret }) {
   const [aapen, setAapen] = useState(false)
@@ -145,16 +259,7 @@ function RedigerProfil({ f, onLagret }) {
           <p style={{ margin: '0 0 16px', fontSize: '.83rem', color: 'var(--muted)' }}>BRREG-data er forhåndsutfylt. Du kan overskrive med oppdatert informasjon.</p>
           <div style={{ display: 'grid', gap: 14 }}>
             {/* Profilbilde */}
-            <div>
-              <label style={lbl}>Profilbilde (URL til bilde)</label>
-              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                <input className="inp" value={bildeUrl} onChange={e => setBildeUrl(e.target.value)} placeholder="https://eksempel.no/bilde.jpg" style={{ flex: 1 }} />
-                {bildeUrl && (
-                  <img src={bildeUrl} alt="Forhåndsvisning" style={{ width: 48, height: 48, borderRadius: 'var(--r-sm)', objectFit: 'cover', border: '1px solid var(--border)', flexShrink: 0 }} onError={e => { e.target.style.display = 'none' }} />
-                )}
-              </div>
-              <p style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 4 }}>Last opp bildet ditt på <a href="https://imgur.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>imgur.com</a> og lim inn lenken her.</p>
-            </div>
+            <BildeOpplasting bildeUrl={bildeUrl} onChange={setBildeUrl} />
             {[['Telefon', telefon, setTelefon, '+47 000 00 000'], ['E-post', epost, setEpost, 'post@klinikk.no'], ['Hjemmeside', hjemmeside, setHjemmeside, 'https://www.klinikk.no']].map(([label, val, setter, ph]) => (
               <div key={label}>
                 <label style={lbl}>{label}</label>
@@ -268,28 +373,39 @@ export default function ProfilSide() {
           </nav>
 
           <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
-            <div>
-              {/* Meta-badges */}
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
-                {[
-                  f.organisasjonsform_beskrivelse || f.organisasjonsform_kode,
-                  f.antall_ansatte != null ? `${f.antall_ansatte} ansatte` : null,
-                  f.stiftelsesdato ? `Stiftet ${f.stiftelsesdato.split('-')[0]}` : null,
-                ].filter(Boolean).map(b => (
-                  <span key={b} style={{ fontSize: '.75rem', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', borderRadius: 4, padding: '2px 8px' }}>{b}</span>
-                ))}
-              </div>
-              <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 800, color: '#fff', margin: '0 0 6px', letterSpacing: '-.02em' }}>
-                {f.navn}
-              </h1>
-              <p style={{ margin: '0 0 14px', fontSize: '.95rem', color: 'rgba(255,255,255,0.5)' }}>
-                Fysioterapiklinikk · {f.poststed}{f.fylke && f.fylke !== f.poststed ? `, ${f.fylke}` : ''}
-              </p>
-              {f.spesialiteter?.length > 0 && (
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                  {f.spesialiteter.map(s => <Tag key={s} label={s} size="lg" />)}
-                </div>
+            <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+              {/* Profilbilde */}
+              {f.bilde_url && (
+                <img
+                  src={f.bilde_url}
+                  alt={f.navn}
+                  style={{ width: 80, height: 80, borderRadius: 'var(--r)', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.15)', flexShrink: 0 }}
+                  onError={e => { e.target.style.display = 'none' }}
+                />
               )}
+              <div>
+                {/* Meta-badges */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+                  {[
+                    f.organisasjonsform_beskrivelse || f.organisasjonsform_kode,
+                    f.antall_ansatte != null ? `${f.antall_ansatte} ansatte` : null,
+                    f.stiftelsesdato ? `Stiftet ${f.stiftelsesdato.split('-')[0]}` : null,
+                  ].filter(Boolean).map(b => (
+                    <span key={b} style={{ fontSize: '.75rem', background: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', borderRadius: 4, padding: '2px 8px' }}>{b}</span>
+                  ))}
+                </div>
+                <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 'clamp(1.6rem, 4vw, 2.4rem)', fontWeight: 800, color: '#fff', margin: '0 0 6px', letterSpacing: '-.02em' }}>
+                  {f.navn}
+                </h1>
+                <p style={{ margin: '0 0 14px', fontSize: '.95rem', color: 'rgba(255,255,255,0.5)' }}>
+                  Fysioterapiklinikk · {f.poststed}{f.fylke && f.fylke !== f.poststed ? `, ${f.fylke}` : ''}
+                </p>
+                {f.spesialiteter?.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {f.spesialiteter.map(s => <Tag key={s} label={s} size="lg" />)}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Kontaktkort (desktop) */}
