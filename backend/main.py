@@ -292,7 +292,7 @@ def health():
 
 def _send_verifiserings_epost(til: str, navn: str, lenke: str):
     resend.Emails.send({
-        "from": "Finn Fysioterapeut <noreply@finnfysioterapeut.no>",
+        "from": "Finn Fysioterapeut <onboarding@resend.dev>",
         "to": [til],
         "subject": f"Bekreft eierskap av {navn}",
         "html": f"""
