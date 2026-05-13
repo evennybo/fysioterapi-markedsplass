@@ -65,7 +65,8 @@ function KrevProfil({ orgnr, navn }) {
   const send = async () => {
     setSteg('sender')
     try {
-      const res = await fetch(`/api/krev-profil/${orgnr}`, { method: 'POST' })
+      const apiBase = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
+      const res = await fetch(`${apiBase}/krev-profil/${orgnr}`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) { setSvar({ feil: data.detail?.melding || data.detail || 'Noe gikk galt' }); setSteg('feil') }
       else { setSvar(data); setSteg('sendt') }

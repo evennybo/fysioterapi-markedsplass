@@ -1,14 +1,17 @@
 // src/pages/VerifiserSide.jsx
 import { useEffect, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
+import { Nav, Footer } from '../components/shared.jsx'
+
+const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
 
 export default function VerifiserSide() {
   const { token } = useParams()
   const navigate = useNavigate()
-  const [steg, setSteg] = useState('verifiserer') // verifiserer | ok | feil
+  const [steg, setSteg] = useState('verifiserer')
 
   useEffect(() => {
-    fetch(`/api/verifiser/${token}`)
+    fetch(`${API_BASE}/verifiser/${token}`)
       .then(r => r.json().then(d => ({ ok: r.ok, data: d })))
       .then(({ ok, data }) => {
         if (!ok) { setSteg('feil'); return }
@@ -23,39 +26,36 @@ export default function VerifiserSide() {
   }, [token])
 
   return (
-    <div style={{ maxWidth: 480, margin: '8rem auto', padding: '2rem', fontFamily: 'system-ui, sans-serif', textAlign: 'center' }}>
-      {steg === 'verifiserer' && (
-        <>
-          <div style={spinner} />
-          <p style={{ color: '#718096', marginTop: 20 }}>Verifiserer lenke ...</p>
-        </>
-      )}
-
-      {steg === 'ok' && (
-        <div style={{ padding: '2rem', borderRadius: 16, background: '#f0fff4', border: '1px solid #9ae6b4' }}>
-          <div style={{ fontSize: '3rem' }}>✓</div>
-          <h2 style={{ color: '#276749', margin: '12px 0 8px' }}>Du er nå verifisert!</h2>
-          <p style={{ color: '#276749', margin: 0 }}>
-            Innlogget som <b>{localStorage.getItem('eier_epost')}</b>
-          </p>
-          <p style={{ color: '#718096', fontSize: '0.875rem', marginTop: 8 }}>Sender deg til profilen ...</p>
-        </div>
-      )}
-
-      {steg === 'feil' && (
-        <div style={{ padding: '2rem', borderRadius: 16, background: '#fff5f5', border: '1px solid #feb2b2' }}>
-          <div style={{ fontSize: '3rem' }}>⚠️</div>
-          <h2 style={{ color: '#c53030', margin: '12px 0 8px' }}>Ugyldig lenke</h2>
-          <p style={{ color: '#718096', margin: 0 }}>Lenken er enten brukt opp eller utløpt (gyldig i 24 timer).</p>
-          <Link to="/" style={{ display: 'inline-block', marginTop: 20, color: '#3182ce' }}>← Tilbake til forsiden</Link>
-        </div>
-      )}
+    <div>
+      <Nav />
+      <div style={{ maxWidth: 480, margin: '8rem auto', padding: '0 24px', textAlign: 'center' }}>
+        {steg === 'verifiserer' && (
+          <>
+            <div style={{ width: 44, height: 44, borderRadius: '50%', border: '4px solid var(--border)', borderTopColor: 'var(--accent)', animation: 'spin .8s linear infinite', margin: '0 auto 20px' }} />
+            <p style={{ color: 'var(--muted)' }}>Verifiserer lenke ...</p>
+          </>
+        )}
+        {steg === 'ok' && (
+          <div className="card" style={{ padding: '2rem' }}>
+            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-d)', fontWeight: 700, fontSize: '1.3rem', color: 'var(--text)', margin: '0 0 8px' }}>Du er nå verifisert!</h2>
+            <p style={{ color: 'var(--muted)', margin: '0 0 6px' }}>
+              Innlogget som <b>{localStorage.getItem('eier_epost')}</b>
+            </p>
+            <p style={{ fontSize: '.85rem', color: 'var(--muted)', opacity: .7 }}>Sender deg til profilen ...</p>
+          </div>
+        )}
+        {steg === 'feil' && (
+          <div className="card" style={{ padding: '2rem', borderColor: '#FEB2B2' }}>
+            <h2 style={{ fontFamily: 'var(--font-d)', fontWeight: 700, fontSize: '1.3rem', color: '#c53030', margin: '0 0 8px' }}>Ugyldig lenke</h2>
+            <p style={{ color: 'var(--muted)', margin: '0 0 20px' }}>Lenken er enten brukt opp eller utløpt (gyldig i 24 timer).</p>
+            <Link to="/" className="btn btn-primary">← Tilbake til forsiden</Link>
+          </div>
+        )}
+      </div>
+      <Footer />
     </div>
   )
-}
-
-const spinner = {
-  width: 48, height: 48, borderRadius: '50%',
-  border: '4px solid #e2e8f0', borderTopColor: '#3182ce',
-  animation: 'spin 0.8s linear infinite', margin: '0 auto',
 }
