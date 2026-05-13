@@ -117,6 +117,7 @@ function RedigerProfil({ f, onLagret }) {
   const [epost, setEpost]             = useState(f.epost || f.brreg_epost || '')
   const [hjemmeside, setHjemmeside]   = useState(f.hjemmeside || f.brreg_hjemmeside || '')
   const [beskrivelse, setBeskrivelse] = useState(f.beskrivelse || f.aktivitet || '')
+  const [bildeUrl, setBildeUrl]       = useState(f.bilde_url || '')
   const [spesialiteter, setSpesialiteter] = useState(f.spesialiteter || [])
   const [nySpec, setNySpec] = useState('')
   const sesjonToken = localStorage.getItem('sesjon_token')
@@ -125,7 +126,7 @@ function RedigerProfil({ f, onLagret }) {
   const lagre = async () => {
     setLagrer(true); setMelding(null)
     try {
-      await oppdaterProfil(f.organisasjonsnummer, { telefon: telefon || null, epost: epost || null, hjemmeside: hjemmeside || null, beskrivelse: beskrivelse || null, spesialiteter }, sesjonToken)
+      await oppdaterProfil(f.organisasjonsnummer, { telefon: telefon || null, epost: epost || null, hjemmeside: hjemmeside || null, beskrivelse: beskrivelse || null, spesialiteter, bilde_url: bildeUrl || null }, sesjonToken)
       setMelding({ type: 'ok', tekst: 'Profilen er oppdatert!' }); onLagret()
     } catch (e) { setMelding({ type: 'feil', tekst: `Feil: ${e.message}` }) }
     finally { setLagrer(false) }
@@ -143,6 +144,17 @@ function RedigerProfil({ f, onLagret }) {
         <div style={{ padding: '20px', background: 'var(--surface)' }}>
           <p style={{ margin: '0 0 16px', fontSize: '.83rem', color: 'var(--muted)' }}>BRREG-data er forhåndsutfylt. Du kan overskrive med oppdatert informasjon.</p>
           <div style={{ display: 'grid', gap: 14 }}>
+            {/* Profilbilde */}
+            <div>
+              <label style={lbl}>Profilbilde (URL til bilde)</label>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <input className="inp" value={bildeUrl} onChange={e => setBildeUrl(e.target.value)} placeholder="https://eksempel.no/bilde.jpg" style={{ flex: 1 }} />
+                {bildeUrl && (
+                  <img src={bildeUrl} alt="Forhåndsvisning" style={{ width: 48, height: 48, borderRadius: 'var(--r-sm)', objectFit: 'cover', border: '1px solid var(--border)', flexShrink: 0 }} onError={e => { e.target.style.display = 'none' }} />
+                )}
+              </div>
+              <p style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 4 }}>Last opp bildet ditt på <a href="https://imgur.com" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>imgur.com</a> og lim inn lenken her.</p>
+            </div>
             {[['Telefon', telefon, setTelefon, '+47 000 00 000'], ['E-post', epost, setEpost, 'post@klinikk.no'], ['Hjemmeside', hjemmeside, setHjemmeside, 'https://www.klinikk.no']].map(([label, val, setter, ph]) => (
               <div key={label}>
                 <label style={lbl}>{label}</label>

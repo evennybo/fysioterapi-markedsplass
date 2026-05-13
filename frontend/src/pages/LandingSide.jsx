@@ -98,13 +98,12 @@ export default function LandingSide() {
       {/* ── Stats bar ── */}
       {statistikk && (
         <div style={{ background: 'var(--elevated)', borderBottom: '1px solid var(--border)' }}>
-          <div className="wrap" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)' }}>
+          <div className="wrap" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)' }}>
             {[
               { n: statistikk.aktive.toLocaleString('no'), l: 'aktive klinikker' },
-              { n: statistikk.kommuner_representert, l: 'kommuner' },
-              { n: 15, l: 'fylker' },
+              { n: 'I hele Norge', l: 'fra Nordkapp til Lindesnes' },
             ].map((s, i) => (
-              <div key={i} style={{ padding: '18px 0', textAlign: 'center', borderRight: i < 2 ? '1px solid var(--border)' : 'none' }}>
+              <div key={i} style={{ padding: '18px 0', textAlign: 'center', borderRight: i < 1 ? '1px solid var(--border)' : 'none' }}>
                 <div style={{ fontFamily: 'var(--font-d)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent)' }}>{s.n}</div>
                 <div style={{ fontSize: '.78rem', color: 'var(--text)', opacity: .65, marginTop: 2 }}>{s.l}</div>
               </div>

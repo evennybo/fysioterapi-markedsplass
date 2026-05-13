@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { sokFysioterapeuter, hentFylker, hentKommuner, hentStatistikk } from '../lib/api.js'
-import { Nav, Footer, Tag, Icon } from '../components/shared.jsx'
+import { Nav, Footer, Tag, Icon, FaqAccordion } from '../components/shared.jsx'
+import { genererSEOInnhold, GENERELL_FAQ } from '../lib/seoContent.js'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
@@ -28,7 +29,7 @@ async function hentKartData({ q, fylke, kommune }) {
   return res.json()
 }
 
-// ── Leaflet-kart med clustering ──────────────────────────────────────────────
+// ── Leaflet-kart ──────────────────────────────────────────────────────────────
 function SokKart({ q, fylke, kommune }) {
   const containerRef = useRef(null)
   const mapRef = useRef(null)
@@ -111,28 +112,54 @@ function SokKart({ q, fylke, kommune }) {
 
 // ── Resultat-kort ─────────────────────────────────────────────────────────────
 function ResultatKort({ f, kompakt }) {
+  const erVerifisert = !!(f.beskrivelse || f.epost || f.telefon || f.hjemmeside || f.bilde_url || f.spesialiteter?.length)
   return (
     <Link to={`/fysioterapeut/${f.organisasjonsnummer}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-      <div className="card card-hover" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <div
+        className="card card-hover"
+        style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 14,
+          borderLeft: erVerifisert ? '3px solid var(--accent)' : undefined,
+        }}
+      >
+        {/* Profilbilde */}
+        {f.bilde_url && (
+          <img
+            src={f.bilde_url}
+            alt={f.navn}
+            style={{ width: 52, height: 52, borderRadius: 'var(--r-sm)', objectFit: 'cover', flexShrink: 0, border: '1px solid var(--border)' }}
+            onError={e => { e.target.style.display = 'none' }}
+          />
+        )}
+
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
             <h2 style={{ margin: 0, fontSize: kompakt ? '.9rem' : '1rem', fontWeight: 700, fontFamily: 'var(--font-d)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>
               {f.navn}
             </h2>
-            <span style={{ fontSize: '.72rem', background: 'var(--elevated)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 6px', color: 'var(--text)', opacity: .6, flexShrink: 0 }}>
-              {f.organisasjonsform_kode}
-            </span>
+            {erVerifisert && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontSize: '.7rem', background: 'rgba(15,122,73,0.1)', color: 'var(--accent)', borderRadius: 99, padding: '2px 8px', fontWeight: 700, flexShrink: 0 }}>
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+                Utfylt profil
+              </span>
+            )}
           </div>
-          <p style={{ margin: '0 0 8px', fontSize: '.85rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          <p style={{ margin: '0 0 6px', fontSize: '.85rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
             <Icon name="pin" size={13} color="var(--muted)" />
             {[f.adresse, f.postnummer && f.poststed ? `${f.postnummer} ${f.poststed}` : f.poststed, f.kommune !== f.poststed ? f.kommune : null].filter(Boolean).join(' · ')}
           </p>
+          {f.beskrivelse && !kompakt && (
+            <p style={{ margin: '0 0 8px', fontSize: '.82rem', color: 'var(--muted)', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+              {f.beskrivelse}
+            </p>
+          )}
           {f.spesialiteter?.length > 0 && (
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {f.spesialiteter.slice(0, 3).map(s => <Tag key={s} label={s} />)}
             </div>
           )}
         </div>
+
         <div style={{ textAlign: 'right', flexShrink: 0 }}>
           {f.antall_ansatte != null && (
             <div style={{ fontSize: '.78rem', color: 'var(--muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
@@ -149,6 +176,130 @@ function ResultatKort({ f, kompakt }) {
   )
 }
 
+// ── SEO-innholdseksjon ────────────────────────────────────────────────────────
+function SEOSeksjon({ seo, totalt }) {
+  const { stedInnhold, specInnhold, harSted, harSpec, sted, spesialitet } = seo
+  if (!harSted && !harSpec) return null
+
+  return (
+    <div style={{ marginTop: 64, borderTop: '1px solid var(--border)', paddingTop: 48 }}>
+
+      {/* Sted-seksjon */}
+      {harSted && stedInnhold && (
+        <section style={{ marginBottom: 48 }}>
+          <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 'clamp(1.2rem, 2.5vw, 1.6rem)', fontWeight: 700, color: 'var(--text)', margin: '0 0 16px', letterSpacing: '-.01em' }}>
+            Om fysioterapi i {sted}
+          </h2>
+          <p style={{ color: 'var(--muted)', lineHeight: 1.75, fontSize: '.95rem', maxWidth: 720, margin: '0 0 24px' }}>
+            {stedInnhold.intro}
+          </p>
+          {stedInnhold.fakta && (
+            <p style={{ color: 'var(--muted)', lineHeight: 1.75, fontSize: '.95rem', maxWidth: 720, margin: '0 0 24px' }}>
+              {stedInnhold.fakta}
+            </p>
+          )}
+
+          {/* Bydeler (Oslo) */}
+          {stedInnhold.bydeler && (
+            <div style={{ marginBottom: 32 }}>
+              <h3 style={{ fontFamily: 'var(--font-d)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 12px' }}>
+                Finn fysioterapeut i din bydel
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {stedInnhold.bydeler.map(b => (
+                  <a
+                    key={b}
+                    href={`/sok?q=${encodeURIComponent(b)}`}
+                    style={{ padding: '6px 14px', background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 99, fontSize: '.82rem', fontWeight: 600, color: 'var(--text)', textDecoration: 'none', transition: 'border-color .15s' }}
+                    onMouseEnter={e => e.target.style.borderColor = 'var(--accent)'}
+                    onMouseLeave={e => e.target.style.borderColor = 'var(--border)'}
+                  >
+                    {b}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <h3 style={{ fontFamily: 'var(--font-d)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 12px' }}>
+            Slik finner du riktig fysioterapeut i {sted}
+          </h3>
+          <ul style={{ color: 'var(--muted)', lineHeight: 1.8, fontSize: '.92rem', paddingLeft: 20, margin: '0 0 16px' }}>
+            <li>Sjekk om klinikken har den spesialiteten du trenger</li>
+            <li>Se på antall ansatte – større klinikker har gjerne bredere tilbud</li>
+            <li>Vurder avstand og kollektivtilgang</li>
+            <li>Ring og spør om ventetid – mange tilbyr rask time</li>
+          </ul>
+          <p style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
+            Kilde: <a href="https://www.fysio.no" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Norsk Fysioterapeutforbund (NFF)</a>
+            {' · '}
+            <a href="https://snl.no/fysioterapi" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Store norske leksikon – Fysioterapi</a>
+          </p>
+        </section>
+      )}
+
+      {/* Spesialitet-seksjon */}
+      {harSpec && specInnhold && (
+        <section style={{ marginBottom: 48 }}>
+          <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 'clamp(1.2rem, 2.5vw, 1.6rem)', fontWeight: 700, color: 'var(--text)', margin: '0 0 16px', letterSpacing: '-.01em' }}>
+            Hva er {spesialitet.toLowerCase()}?
+          </h2>
+          <p style={{ color: 'var(--muted)', lineHeight: 1.75, fontSize: '.95rem', maxWidth: 720, margin: '0 0 24px' }}>
+            {specInnhold.hva}
+          </p>
+
+          <h3 style={{ fontFamily: 'var(--font-d)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 12px' }}>
+            Når bør du oppsøke hjelp?
+          </h3>
+          <p style={{ color: 'var(--muted)', lineHeight: 1.75, fontSize: '.92rem', maxWidth: 720, margin: '0 0 24px' }}>
+            {specInnhold.nar}
+          </p>
+
+          <h3 style={{ fontFamily: 'var(--font-d)', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 12px' }}>
+            Vanlige behandlingsmetoder
+          </h3>
+          <ul style={{ color: 'var(--muted)', lineHeight: 1.8, fontSize: '.92rem', paddingLeft: 20, margin: '0 0 16px' }}>
+            {specInnhold.behandling.map(b => <li key={b}>{b}</li>)}
+          </ul>
+
+          {specInnhold.kilde && (
+            <p style={{ fontSize: '.82rem', color: 'var(--muted)' }}>
+              Les mer: <a href={specInnhold.kilde.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>{specInnhold.kilde.tekst}</a>
+              {' · '}
+              <a href={`https://snl.no/${encodeURIComponent(spesialitet.toLowerCase().replace(/ /g, '_'))}`} target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Store norske leksikon</a>
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* FAQ */}
+      <section style={{ marginBottom: 48 }}>
+        <h2 style={{ fontFamily: 'var(--font-d)', fontSize: 'clamp(1.2rem, 2.5vw, 1.6rem)', fontWeight: 700, color: 'var(--text)', margin: '0 0 20px', letterSpacing: '-.01em' }}>
+          Ofte stilte spørsmål
+        </h2>
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '0 20px' }}>
+            <FaqAccordion items={GENERELL_FAQ} />
+          </div>
+        </div>
+      </section>
+
+      {/* Om datakilde */}
+      <section>
+        <h2 style={{ fontFamily: 'var(--font-d)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)', margin: '0 0 12px' }}>
+          Om datagrunnlaget
+        </h2>
+        <p style={{ color: 'var(--muted)', lineHeight: 1.75, fontSize: '.88rem', maxWidth: 680 }}>
+          Oversikten viser {totalt > 0 ? `${totalt.toLocaleString('no')} klinikker` : 'alle klinikker'} registrert med næringskode 86.950 (Fysioterapi- og ergoterapitjenester) i{' '}
+          <a href="https://www.brreg.no" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Brønnøysundregistrene</a>.
+          Data oppdateres jevnlig og er lisensiert under{' '}
+          <a href="https://data.norge.no/nlod/no/" target="_blank" rel="noreferrer" style={{ color: 'var(--accent)' }}>Norsk lisens for offentlige data (NLOD)</a>.
+        </p>
+      </section>
+    </div>
+  )
+}
+
 // ── Søkeside ──────────────────────────────────────────────────────────────────
 export default function SokSide() {
   const [searchParams] = useSearchParams()
@@ -160,7 +311,6 @@ export default function SokSide() {
   const [laster, setLaster]         = useState(false)
   const [fylker, setFylker]         = useState([])
   const [kommuner, setKommuner]     = useState([])
-  const [statistikk, setStatistikk] = useState(null)
   const [visning, setVisning]       = useState('liste')
 
   const [q, setQ]             = useState(searchParams.get('q') || '')
@@ -168,11 +318,21 @@ export default function SokSide() {
   const [kommune, setKommune] = useState(searchParams.get('kommune') || '')
   const [spesialitet, setSpesialitet] = useState(searchParams.get('spesialitet') || '')
 
-  // Debounced verdier
   const [debouncedQ, setDebouncedQ]             = useState(q)
   const [debouncedKommune, setDebouncedKommune] = useState(kommune)
   useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t) }, [q])
   useEffect(() => { const t = setTimeout(() => setDebouncedKommune(kommune), 300); return () => clearTimeout(t) }, [kommune])
+
+  const seo = genererSEOInnhold({ q: debouncedQ, spesialitet, fylke, kommune: debouncedKommune })
+
+  // Oppdater meta-tags dynamisk
+  useEffect(() => {
+    document.title = `${seo.h1} | Finn Fysioterapeut`
+    let md = document.querySelector('meta[name="description"]')
+    if (!md) { md = document.createElement('meta'); md.name = 'description'; document.head.appendChild(md) }
+    md.setAttribute('content', seo.metaDesc)
+    return () => { document.title = 'Finn Fysioterapeut i Norge' }
+  }, [seo.h1, seo.metaDesc])
 
   const sok = useCallback(async (nyeSide = 0) => {
     setLaster(true)
@@ -187,23 +347,8 @@ export default function SokSide() {
   }, [debouncedQ, fylke, debouncedKommune, spesialitet])
 
   useEffect(() => { sok(0); setSide(0) }, [debouncedQ, fylke, debouncedKommune, spesialitet])
-  useEffect(() => {
-    hentFylker().then(setFylker).catch(console.error)
-    hentStatistikk().then(setStatistikk).catch(console.error)
-  }, [])
-  useEffect(() => {
-    hentKommuner(fylke || undefined).then(setKommuner).catch(console.error)
-  }, [fylke])
-
-  useEffect(() => {
-    if (kommune) document.title = `Fysioterapeuter i ${kommune} | Finn Fysioterapeut`
-    else if (fylke) document.title = `Fysioterapeuter i ${fylke} | Finn Fysioterapeut`
-    else if (spesialitet) document.title = `${spesialitet} – Fysioterapeuter | Finn Fysioterapeut`
-    else document.title = 'Finn Fysioterapeut i Norge'
-  }, [fylke, kommune, spesialitet])
-
-  const listeVises = visning === 'liste' || visning === 'delt'
-  const kartVises  = visning === 'kart'  || visning === 'delt'
+  useEffect(() => { hentFylker().then(setFylker).catch(console.error) }, [])
+  useEffect(() => { hentKommuner(fylke || undefined).then(setKommuner).catch(console.error) }, [fylke])
 
   const nullstill = () => { setQ(''); setFylke(''); setKommune(''); setSpesialitet('') }
 
@@ -215,32 +360,15 @@ export default function SokSide() {
       <div style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)', padding: '14px 0', position: 'sticky', top: 60, zIndex: 10 }}>
         <div className="wrap">
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-            <input
-              className="inp"
-              style={{ flex: '2 1 200px', maxWidth: 340 }}
-              placeholder="Søk på navn eller sted..."
-              value={q}
-              onChange={e => setQ(e.target.value)}
-            />
+            <input className="inp" style={{ flex: '2 1 200px', maxWidth: 340 }} placeholder="Søk på navn eller sted..." value={q} onChange={e => setQ(e.target.value)} />
             <select className="inp" style={{ flex: '1 1 150px', maxWidth: 210 }} value={fylke} onChange={e => { setFylke(e.target.value); setKommune('') }}>
               <option value="">Alle fylker</option>
               {fylker.map(f => <option key={f.fylke} value={f.fylke}>{f.fylke} ({f.antall})</option>)}
             </select>
-            <input
-              className="inp"
-              style={{ flex: '1 1 140px', maxWidth: 190 }}
-              placeholder="Kommune..."
-              value={kommune}
-              onChange={e => setKommune(e.target.value)}
-              list="kommuner-liste"
-            />
-            <datalist id="kommuner-liste">
-              {kommuner.map(k => <option key={k.kommune} value={k.kommune} />)}
-            </datalist>
+            <input className="inp" style={{ flex: '1 1 140px', maxWidth: 190 }} placeholder="Kommune..." value={kommune} onChange={e => setKommune(e.target.value)} list="kommuner-liste" />
+            <datalist id="kommuner-liste">{kommuner.map(k => <option key={k.kommune} value={k.kommune} />)}</datalist>
             {(q || fylke || kommune || spesialitet) && (
-              <button className="btn btn-ghost" style={{ padding: '8px 12px', fontSize: '.82rem', whiteSpace: 'nowrap' }} onClick={nullstill}>
-                Nullstill
-              </button>
+              <button className="btn btn-ghost" style={{ padding: '8px 12px', fontSize: '.82rem', whiteSpace: 'nowrap' }} onClick={nullstill}>Nullstill</button>
             )}
           </div>
         </div>
@@ -248,11 +376,11 @@ export default function SokSide() {
 
       {/* ── Innhold ── */}
       <div className="wrap" style={{ padding: '24px 24px 0' }}>
-        {/* Kontroll-linje */}
+        {/* H1 + kontroll-linje */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
           <div>
-            <h1 style={{ fontFamily: 'var(--font-d)', fontSize: '1.5rem', fontWeight: 800, margin: '0 0 2px', letterSpacing: '-.01em', color: 'var(--text)' }}>
-              {fylke ? `Fysioterapeuter i ${fylke}` : spesialitet ? spesialitet : 'Alle fysioterapeuter'}
+            <h1 style={{ fontFamily: 'var(--font-d)', fontSize: 'clamp(1.3rem, 3vw, 1.8rem)', fontWeight: 800, margin: '0 0 2px', letterSpacing: '-.02em', color: 'var(--text)' }}>
+              {seo.h1}
             </h1>
             <p style={{ margin: 0, fontSize: '.85rem', color: 'var(--muted)' }}>
               {laster ? 'Søker ...' : `${totalt.toLocaleString('no')} ${totalt === 1 ? 'klinikk' : 'klinikker'} funnet`}
@@ -263,9 +391,7 @@ export default function SokSide() {
           </div>
           <div className="view-toggle">
             {[['liste', 'Liste'], ['delt', 'Liste + Kart'], ['kart', 'Kart']].map(([mode, label]) => (
-              <button key={mode} className={`vt-btn${visning === mode ? ' active' : ''}`} onClick={() => setVisning(mode)}>
-                {label}
-              </button>
+              <button key={mode} className={`vt-btn${visning === mode ? ' active' : ''}`} onClick={() => setVisning(mode)}>{label}</button>
             ))}
           </div>
         </div>
@@ -290,6 +416,9 @@ export default function SokSide() {
                 <button className="btn btn-ghost" disabled={side >= sider - 1} onClick={() => { sok(side + 1); setSide(s => s + 1) }}>Neste →</button>
               </div>
             )}
+
+            {/* SEO-innhold under resultater */}
+            <SEOSeksjon seo={seo} totalt={totalt} />
           </>
         )}
 
