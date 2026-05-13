@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.env
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Database (ikke commit selve .db – for stor og endres kontinuerlig)
+# backend/fysioterapeuter.db  ← vi inkluderer den for deploy (read-only data)
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
