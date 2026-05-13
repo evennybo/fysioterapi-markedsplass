@@ -16,10 +16,10 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
 })
 
-const BASE = '/api'
+const API_BASE = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : '/api'
 
 async function hentKartData({ q, fylke, kommune }) {
-  const url = new URL(`${BASE}/kart`, window.location.origin)
+  const url = new URL(`${API_BASE}/kart`, window.location.origin)
   if (q) url.searchParams.set('q', q)
   if (fylke) url.searchParams.set('fylke', fylke)
   if (kommune) url.searchParams.set('kommune', kommune)
