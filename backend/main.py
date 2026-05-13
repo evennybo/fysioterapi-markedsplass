@@ -17,6 +17,11 @@ app = FastAPI(
 )
 
 import os
+import resend
+
+resend.api_key = os.environ.get("RESEND_API_KEY", "")
+
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:5173")
 
 ALLOWED_ORIGINS = os.environ.get(
     "ALLOWED_ORIGINS",
@@ -174,17 +179,21 @@ def krev_profil(orgnr: str):
         )
         conn.commit()
 
-        lenke = f"/verifiser/{token}"
+        lenke = f"{FRONTEND_URL}/verifiser/{token}"
         dev_mode = os.environ.get("DEV_MODE", "true").lower() == "true"
 
-        # I produksjon: send e-post her (koble på Resend/SendGrid/SES)
-        # DEV_MODE=true returnerer lenken direkte i svaret (kun for lokal utvikling)
+        if not dev_mode:
+            _send_verifiserings_epost(
+                til=brreg_epost,
+                navn=rad["navn"],
+                lenke=lenke,
+            )
 
         return {
             "status": "ok",
             "navn": rad["navn"],
             "epost_maskert": _masker_epost(brreg_epost),
-            **({"lenke_dev": lenke} if dev_mode else {}),
+            **({"lenke_dev": f"/verifiser/{token}"} if dev_mode else {}),
             "melding": f"En bekreftelseslenke er sendt til {_masker_epost(brreg_epost)}. Lenken er gyldig i 24 timer.",
         }
 
@@ -280,6 +289,40 @@ def health():
 
 
 # ── Hjelpefunksjoner ──────────────────────────────────────────────────────────
+
+def _send_verifiserings_epost(til: str, navn: str, lenke: str):
+    resend.Emails.send({
+        "from": "Finn Fysioterapeut <noreply@finnfysioterapeut.no>",
+        "to": [til],
+        "subject": f"Bekreft eierskap av {navn}",
+        "html": f"""
+        <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
+          <div style="margin-bottom:24px">
+            <span style="background:#0F7A49;color:#fff;font-weight:700;padding:6px 12px;border-radius:6px;font-size:14px">
+              Finn Fysioterapeut
+            </span>
+          </div>
+          <h1 style="font-size:22px;color:#0A1C10;margin:0 0 12px">Bekreft eierskap av {navn}</h1>
+          <p style="color:#2C5038;line-height:1.6;margin:0 0 24px">
+            Vi mottok en forespørsel om å knytte denne profilen til din konto.
+            Klikk på knappen nedenfor for å bekrefte at du er eier av klinikken.
+          </p>
+          <a href="{lenke}"
+             style="display:inline-block;background:#0F7A49;color:#fff;font-weight:600;
+                    padding:12px 28px;border-radius:8px;text-decoration:none;font-size:15px">
+            Bekreft eierskap →
+          </a>
+          <p style="margin:24px 0 0;font-size:13px;color:#666;line-height:1.6">
+            Lenken er gyldig i 24 timer. Hvis du ikke har sendt denne forespørselen, kan du ignorere denne e-posten.
+          </p>
+          <hr style="border:none;border-top:1px solid #eee;margin:24px 0">
+          <p style="font-size:12px;color:#999;margin:0">
+            Finn Fysioterapeut · Åpne data fra Brønnøysundregistrene
+          </p>
+        </div>
+        """,
+    })
+
 
 def _masker_epost(epost: str) -> str:
     if "@" not in epost:
