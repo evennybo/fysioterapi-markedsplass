@@ -325,14 +325,53 @@ export default function SokSide() {
 
   const seo = genererSEOInnhold({ q: debouncedQ, spesialitet, fylke, kommune: debouncedKommune })
 
-  // Oppdater meta-tags dynamisk
+  // Oppdater meta-tags + JSON-LD dynamisk
   useEffect(() => {
-    document.title = `${seo.h1} | Finn Fysioterapeut`
-    let md = document.querySelector('meta[name="description"]')
-    if (!md) { md = document.createElement('meta'); md.name = 'description'; document.head.appendChild(md) }
-    md.setAttribute('content', seo.metaDesc)
-    return () => { document.title = 'Finn Fysioterapeut i Norge' }
-  }, [seo.h1, seo.metaDesc])
+    const SITE = 'https://klinikkene.no'
+    const tittel = `${seo.h1} | klinikkene.no`
+    document.title = tittel
+
+    const setOrCreate = (sel, attrs) => {
+      let el = document.querySelector(sel)
+      if (!el) { el = document.createElement('meta'); document.head.appendChild(el) }
+      Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, v))
+    }
+
+    setOrCreate('meta[name="description"]', { name: 'description', content: seo.metaDesc })
+    setOrCreate('meta[property="og:title"]', { property: 'og:title', content: tittel })
+    setOrCreate('meta[property="og:description"]', { property: 'og:description', content: seo.metaDesc })
+
+    // Canonical
+    let canonical = document.querySelector('link[rel="canonical"]')
+    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical) }
+    const params = new URLSearchParams()
+    if (debouncedQ) params.set('q', debouncedQ)
+    if (fylke) params.set('fylke', fylke)
+    if (debouncedKommune) params.set('kommune', debouncedKommune)
+    if (spesialitet) params.set('spesialitet', spesialitet)
+    canonical.href = params.toString() ? `${SITE}/sok?${params}` : `${SITE}/sok`
+
+    // FAQPage JSON-LD
+    const existing = document.getElementById('ld-json-sok')
+    if (existing) existing.remove()
+    const sc = document.createElement('script')
+    sc.id = 'ld-json-sok'; sc.type = 'application/ld+json'
+    sc.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: GENERELL_FAQ.map(item => ({
+        '@type': 'Question',
+        name: item.q,
+        acceptedAnswer: { '@type': 'Answer', text: item.a },
+      })),
+    })
+    document.head.appendChild(sc)
+
+    return () => {
+      document.title = 'Finn Fysioterapeut i Norge – klinikkene.no'
+      document.getElementById('ld-json-sok')?.remove()
+    }
+  }, [seo.h1, seo.metaDesc, debouncedQ, fylke, debouncedKommune, spesialitet])
 
   const sok = useCallback(async (nyeSide = 0) => {
     setLaster(true)

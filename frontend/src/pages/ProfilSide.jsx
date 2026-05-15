@@ -312,25 +312,86 @@ export default function ProfilSide() {
 
   useEffect(() => {
     if (!f) return
+    const SITE = 'https://klinikkene.no'
     const sted = f.poststed || f.kommune || ''
-    document.title = sted ? `${f.navn} – Fysioterapeut i ${sted} | Finn Fysioterapeut` : `${f.navn} | Finn Fysioterapeut`
-    const md = document.querySelector('meta[name="description"]')
-    const besk = f.beskrivelse || f.aktivitet || `Fysioterapeut i ${[f.adresse, f.postnummer, f.poststed, f.kommune].filter(Boolean).join(', ')}.`
-    if (md) md.setAttribute('content', besk)
+    const tittel = sted
+      ? `${f.navn} – Fysioterapeut i ${sted} | klinikkene.no`
+      : `${f.navn} | klinikkene.no`
+    const besk = f.beskrivelse || f.aktivitet ||
+      `${f.navn} er en fysioterapiklinikk i ${[f.postnummer && f.poststed ? `${f.postnummer} ${f.poststed}` : f.poststed, f.fylke].filter(Boolean).join(', ')}. Finn kontaktinfo, adresse og spesialiteter på klinikkene.no.`
+    const pageUrl = `${SITE}/fysioterapeut/${f.organisasjonsnummer}`
+
+    document.title = tittel
+
+    const setMeta = (sel, attr, val) => { const el = document.querySelector(sel); if (el) el.setAttribute(attr, val) }
+    const setOrCreate = (id, sel, attr, val) => {
+      let el = document.getElementById(id) || document.querySelector(sel)
+      if (!el) { el = document.createElement('meta'); if (id) el.id = id; document.head.appendChild(el) }
+      el.setAttribute(attr, val)
+    }
+
+    setMeta('meta[name="description"]', 'content', besk)
+
+    // Canonical
+    let canonical = document.querySelector('link[rel="canonical"]')
+    if (!canonical) { canonical = document.createElement('link'); canonical.rel = 'canonical'; document.head.appendChild(canonical) }
+    canonical.setAttribute('href', pageUrl)
+
+    // Open Graph
+    setOrCreate('og-title', 'meta[property="og:title"]', 'content', tittel)
+    setOrCreate('og-desc', 'meta[property="og:description"]', 'content', besk)
+    setOrCreate('og-url', 'meta[property="og:url"]', 'content', pageUrl)
+    if (f.bilde_url && !f.bilde_url.startsWith('data:')) {
+      setOrCreate('og-image', 'meta[property="og:image"]', 'content', f.bilde_url)
+    }
+
+    // Twitter
+    setOrCreate('tw-title', 'meta[name="twitter:title"]', 'content', tittel)
+    setOrCreate('tw-desc', 'meta[name="twitter:description"]', 'content', besk)
+
+    // JSON-LD: MedicalBusiness + BreadcrumbList
     const existing = document.getElementById('ld-json-profil')
     if (existing) existing.remove()
     const sc = document.createElement('script')
     sc.id = 'ld-json-profil'; sc.type = 'application/ld+json'
-    sc.text = JSON.stringify({
-      '@context': 'https://schema.org', '@type': 'MedicalBusiness',
-      name: f.navn, medicalSpecialty: 'Physiotherapy',
-      address: { '@type': 'PostalAddress', streetAddress: f.adresse, postalCode: f.postnummer, addressLocality: f.poststed || f.kommune, addressRegion: f.fylke, addressCountry: 'NO' },
-      ...(f.telefon || f.brreg_mobil ? { telephone: f.telefon || f.brreg_mobil } : {}),
-      ...(f.hjemmeside || f.brreg_hjemmeside ? { url: f.hjemmeside || f.brreg_hjemmeside } : {}),
-      ...(f.epost || f.brreg_epost ? { email: f.epost || f.brreg_epost } : {}),
-    })
+    sc.text = JSON.stringify([
+      {
+        '@context': 'https://schema.org',
+        '@type': 'MedicalBusiness',
+        '@id': pageUrl,
+        name: f.navn,
+        medicalSpecialty: 'Physiotherapy',
+        url: pageUrl,
+        address: {
+          '@type': 'PostalAddress',
+          streetAddress: f.adresse,
+          postalCode: f.postnummer,
+          addressLocality: f.poststed || f.kommune,
+          addressRegion: f.fylke,
+          addressCountry: 'NO',
+        },
+        ...(f.telefon || f.brreg_mobil ? { telephone: f.telefon || f.brreg_mobil } : {}),
+        ...(f.hjemmeside || f.brreg_hjemmeside ? { sameAs: f.hjemmeside || f.brreg_hjemmeside } : {}),
+        ...(f.bilde_url && !f.bilde_url.startsWith('data:') ? { image: f.bilde_url } : {}),
+        ...(f.spesialiteter?.length ? { knowsAbout: f.spesialiteter } : {}),
+      },
+      {
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Hjem', item: SITE },
+          ...(f.fylke ? [{ '@type': 'ListItem', position: 2, name: f.fylke, item: `${SITE}/sok?fylke=${encodeURIComponent(f.fylke)}` }] : []),
+          { '@type': 'ListItem', position: f.fylke ? 3 : 2, name: f.navn, item: pageUrl },
+        ],
+      },
+    ])
     document.head.appendChild(sc)
-    return () => { document.title = 'Finn Fysioterapeut i Norge'; document.getElementById('ld-json-profil')?.remove() }
+
+    return () => {
+      document.title = 'Finn Fysioterapeut i Norge – klinikkene.no'
+      document.getElementById('ld-json-profil')?.remove()
+      document.querySelector('link[rel="canonical"]')?.setAttribute('href', `${SITE}/`)
+    }
   }, [f])
 
   if (feil) return (

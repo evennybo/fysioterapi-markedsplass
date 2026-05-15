@@ -288,6 +288,73 @@ def health():
     return {"status": "ok"}
 
 
+# ── Sitemap ───────────────────────────────────────────────────────────────────
+
+@app.get("/sitemap.xml", tags=["SEO"], response_class=None)
+def sitemap():
+    """Dynamisk sitemap for alle klinikksider + søkesider."""
+    from fastapi.responses import Response
+
+    SITE = os.environ.get("FRONTEND_URL", "https://klinikkene.no").rstrip("/")
+
+    SPESIALITETER = [
+        "Idrettsskader", "Rygg og nakke", "Barn og unge", "Eldre og geriatri",
+        "Nevrologisk", "Bekkenbunnsykdom", "Post-operativ", "Hjemmebesøk",
+        "Arbeidsrelaterte skader", "Hodepine og svimmelhet", "Svangerskap",
+    ]
+    POPULAERE_STEDER = [
+        "Oslo", "Bergen", "Trondheim", "Stavanger", "Tromsø",
+        "Kristiansand", "Drammen", "Sandnes", "Fredrikstad",
+        "Bodø", "Ålesund", "Tønsberg",
+    ]
+
+    urls = []
+
+    def u(loc, priority="0.5", changefreq="weekly"):
+        urls.append(f"""  <url>
+    <loc>{loc}</loc>
+    <changefreq>{changefreq}</changefreq>
+    <priority>{priority}</priority>
+  </url>""")
+
+    # Statiske sider
+    u(f"{SITE}/", priority="1.0", changefreq="daily")
+    u(f"{SITE}/sok", priority="0.9", changefreq="daily")
+
+    # Søk på populære steder
+    for sted in POPULAERE_STEDER:
+        from urllib.parse import quote
+        u(f"{SITE}/sok?q={quote(sted)}", priority="0.8", changefreq="weekly")
+
+    # Søk på spesialiteter
+    for spec in SPESIALITETER:
+        from urllib.parse import quote
+        u(f"{SITE}/sok?spesialitet={quote(spec)}", priority="0.8", changefreq="weekly")
+
+    # Alle klinikksider
+    with get_db() as conn:
+        rader = conn.execute(
+            "SELECT organisasjonsnummer, sist_oppdatert_i_db FROM fysioterapeuter "
+            "WHERE konkurs=0 AND under_avvikling=0"
+        ).fetchall()
+
+    for rad in rader:
+        dato = (rad["sist_oppdatert_i_db"] or "")[:10] or None
+        lastmod = f"\n    <lastmod>{dato}</lastmod>" if dato else ""
+        urls.append(f"""  <url>
+    <loc>{SITE}/fysioterapeut/{rad["organisasjonsnummer"]}</loc>{lastmod}
+    <changefreq>monthly</changefreq>
+    <priority>0.6</priority>
+  </url>""")
+
+    xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+    xml += "\n".join(urls)
+    xml += "\n</urlset>"
+
+    return Response(content=xml, media_type="application/xml")
+
+
 # ── Hjelpefunksjoner ──────────────────────────────────────────────────────────
 
 def _send_verifiserings_epost(til: str, navn: str, lenke: str):
